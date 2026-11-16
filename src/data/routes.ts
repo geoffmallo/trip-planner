@@ -5,7 +5,8 @@
 // Sources: parks.tas.gov.au walk notes (Western Arthur Range, Mt Anne Circuit),
 // trailhiking.com.au planning guides, halfwayanywhere.com, bushwalk.com forum,
 // bushwalktracknotes.blogspot.com, adelaidebushwalkers.org.
-import type { Leg, RouteDef, Waypoint } from '../model'
+import type { Leg, RouteDef, SideTrip, Waypoint } from '../model'
+import guide from './guide.json' with { type: 'json' }
 
 type W = Waypoint
 type L = Leg
@@ -78,7 +79,7 @@ const kappaLeg: L = { km: 5.5, up: 30, down: 700, hrs: 2.5, conf: 'low', note: '
 // ---------- Full traverse: eastern continuation ----------
 const east: W[] = [
   { id: 'lake-vesta', name: 'Lake Vesta', elev: 860, camp: true, water: 'Lake', note: 'Emergency-use sites on NE side. Steep gully descent from the Kappa junction.' },
-  { id: 'lake-juno', name: 'Lake Juno', elev: 760, water: 'Lake', note: 'Steep descent from Vesta.' },
+  { id: 'lake-juno', name: 'Lake Juno', elev: 760, camp: true, water: 'Lake', note: 'Steep descent from Vesta. Small emergency site at the outlet.' },
   { id: 'promontory-lake', name: 'Promontory Lake', elev: 860, camp: true, water: 'Lake; filter', note: 'Designated site at SE corner; poorly sheltered.' },
   { id: 'the-phoenix', name: 'The Phoenix', elev: 1091, water: 'None', note: 'Faint pad past The Sculpture; boulder-strewn summit.' },
   { id: 'west-portal-jn', name: 'West Portal ridge (pack drop)', elev: 1100, water: 'None', note: 'After ~3 km of Centaurus Ridge, overgrown in parts. Leave packs for West Portal summit.' },
@@ -111,15 +112,7 @@ export const waAk: RouteDef = {
   stops: [...waStart, ...plains],
   legs: [...waStartLegs, kappaLeg, ...plainsLegs],
   standardCamps: ['junction-creek', 'lake-cygnus', 'lake-oberon', 'high-moor', 'haven-lake', 'junction-creek-r'],
-  sideTrips: [
-    { at: 'moraine-a-top', name: 'Mt Hesperus (1098 m)', km: 1.0, hrs: 0.75, up: 50 },
-    { at: 'mt-hayes', name: 'Mt Hayes summit (1119 m)', km: 0.6, hrs: 0.67, up: 60 },
-    { at: 'orion-saddle', name: 'Mt Orion / Mt Sirius (1151 m)', km: 0.6, hrs: 0.75, up: 150 },
-    { at: 'high-moor', name: 'Mt Columba (1042 m)', km: 0.5, hrs: 0.25, up: 90 },
-    { at: 'high-moor', name: 'Dorado Peak (1068 m)', km: 1.2, hrs: 2, up: 120 },
-    { at: 'haven-lake', name: 'Mt Aldebaran (1107 m)', km: 2.2, hrs: 2, up: 230 },
-    { at: 'mt-scorpio', name: 'Mt Scorpio summit (1106 m)', km: 0.1, hrs: 0.17, up: 16 },
-  ],
+  sideTrips: [],
 }
 
 export const waFull: RouteDef = {
@@ -142,10 +135,7 @@ export const waFull: RouteDef = {
     'lake-rosanne',
     'seven-mile-creek',
   ],
-  sideTrips: [
-    ...(waAk.sideTrips ?? []),
-    { at: 'west-portal-jn', name: 'West Portal summit (~1185 m)', km: 0.8, hrs: 0.75, up: 90 },
-  ],
+  sideTrips: [],
 }
 
 export const mtAnne: RouteDef = {
@@ -162,7 +152,7 @@ export const mtAnne: RouteDef = {
     { id: 'mt-anne-jn', name: 'Mt Anne summit junction', elev: 1250, water: 'Seasonal tarns', note: 'Near Eve Peak. Boulder fields and cairns; navigation needed.' },
     { id: 'shelf-camp', name: 'Shelf Camp', elev: 1170, camp: true, water: 'Tarns', note: 'Rock slab, extremely exposed to NE. Freestanding tent anchored with rocks. Toilet pod.' },
     { id: 'the-notch', name: 'The Notch', elev: 1150, water: 'None', note: 'Pack hauling likely; carry ~15 m rope. Site of many rescues.' },
-    { id: 'mt-lot', name: 'Mt Lot', elev: 1200, water: 'None', note: 'Rough rock traverse, then Lightning Ridge.' },
+    { id: 'mt-lot', name: 'Mt Lot', elev: 1262, water: 'None', note: 'Rough rock traverse, then Lightning Ridge.' },
     { id: 'lonely-tarns', name: 'Lonely Tarns', elev: 900, camp: true, water: 'Tarn beside camp', note: 'Past Lake Picone. Platforms with chains, toilet pod.' },
     { id: 'sarah-jane-jn', name: 'Mt Sarah Jane junction', elev: 950, water: 'Seasonal', note: 'Muddy plateau. Optional Mt Sarah Jane ascent.' },
     { id: 'anne-river-jn', name: 'Anne River / Lake Judd jn', elev: 380, water: 'Anne River', note: 'Steep, overgrown, slippery ~600 m descent. Lake Judd side camp 30–45 min away.' },
@@ -183,10 +173,15 @@ export const mtAnne: RouteDef = {
     { km: 8.2, up: 60, down: 60, hrs: 2, conf: 'med', note: 'Road walk, or car shuffle / hitch.' },
   ],
   standardCamps: ['high-camp-hut', 'shelf-camp', 'lonely-tarns'],
-  sideTrips: [
-    { at: 'mt-anne-jn', name: 'Mt Anne summit (1423 m)', km: 2, hrs: 2, up: 180, note: 'Extremely exposed scramble. Not in poor weather.' },
-    { at: 'anne-river-jn', name: 'Lake Judd', km: 2.2, hrs: 1.5, up: 170 },
-  ],
+  sideTrips: [],
+}
+
+// Side trips come from the researched guide (src/data/guide.json), attached to every
+// route that passes their stop. "Full traverse only" ones are left off A–K.
+const SIDE = guide.sideTrips as SideTrip[]
+for (const r of [waAk, waFull, mtAnne]) {
+  const ids = new Set(r.stops.map((s) => s.id))
+  r.sideTrips = SIDE.filter((t) => ids.has(t.at) && !(r.id === 'wa-ak' && /full traverse only/i.test(t.note ?? '')))
 }
 
 export const ROUTES: Record<string, RouteDef> = { 'wa-ak': waAk, 'wa-full': waFull, 'mt-anne': mtAnne }

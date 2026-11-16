@@ -27,7 +27,28 @@ export default defineConfig({
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png}'] },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // MapLibre chunk
+        // Super Topo tiles + fonts: served from the offline cache first (see src/map/offline.ts).
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/mapserve\.geoff-7a5\.workers\.dev\/style\.json/,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'map-tiles', networkTimeoutSeconds: 4, cacheableResponse: { statuses: [200] } },
+          },
+          {
+            urlPattern: /^https:\/\/mapserve\.geoff-7a5\.workers\.dev\/(ofm|tas-base|osm)\//,
+            handler: 'CacheFirst',
+            options: { cacheName: 'map-tiles', cacheableResponse: { statuses: [200] } },
+          },
+          {
+            urlPattern: /^https:\/\/protomaps\.github\.io\/basemaps-assets\/fonts\//,
+            handler: 'CacheFirst',
+            options: { cacheName: 'map-tiles', cacheableResponse: { statuses: [200] } },
+          },
+        ],
+      },
     }),
   ],
 })

@@ -21,8 +21,11 @@ import {
   type TripState,
 } from './model'
 import { decodeTrip, defaultTrip, downloadJson, shareUrl, useTrip } from './store'
+import { legGuide, stopGuide } from './data/guide'
+import type { Focus } from './map/geo'
+import { LazyMap, MapOverlay, MapTab, OfflinePanel } from './MapViews'
 
-type Tab = 'plan' | 'routes' | 'notes'
+type Tab = 'plan' | 'map' | 'routes' | 'notes'
 type Sheet =
   | { kind: 'leg'; segUid: string; lx: LegX }
   | { kind: 'addStop'; segUid: string; afterId: string; afterName: string; suggestions: SideTrip[] }
@@ -36,6 +39,7 @@ export default function App() {
   const [sheet, setSheet] = useState<Sheet>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [pending, setPending] = useState<TripState | null>(null)
+  const [mapFocus, setMapFocus] = useState<Focus | null>(null)
   const it = useMemo(() => buildItinerary(trip, ROUTES), [trip])
 
   // Incoming share link
@@ -101,9 +105,9 @@ export default function App() {
       <div className="sticky">
         <Timeline days={it.days} pace={pace} />
         <nav className="tabs">
-          {(['plan', 'routes', 'notes'] as Tab[]).map((k) => (
+          {(['plan', 'map', 'routes', 'notes'] as Tab[]).map((k) => (
             <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-              {k === 'plan' ? 'Itinerary' : k === 'routes' ? 'Routes' : 'Notes'}
+              {k === 'plan' ? 'Itinerary' : k === 'map' ? 'Map' : k === 'routes' ? 'Routes' : 'Notes'}
             </button>
           ))}
         </nav>
@@ -111,7 +115,26 @@ export default function App() {
 
       <main>
         {tab === 'plan' && (
-          <PlanView trip={trip} days={it.days} segTotals={it.segmentTotals} pace={pace} updateSeg={updateSeg} update={update} setSheet={setSheet} />
+          <PlanView
+            trip={trip}
+            days={it.days}
+            segTotals={it.segmentTotals}
+            pace={pace}
+            updateSeg={updateSeg}
+            update={update}
+            setSheet={setSheet}
+            openMap={setMapFocus}
+          />
+        )}
+        {tab === 'map' && (
+          <MapTab
+            days={it.days}
+            trip={trip}
+            onOpenDay={(day) => {
+              setTab('plan')
+              setTimeout(() => document.getElementById(`day-${day}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+            }}
+          />
         )}
         {tab === 'routes' && <RoutesView trip={trip} update={update} updateSeg={updateSeg} segTotals={it.segmentTotals} pace={pace} />}
         {tab === 'notes' && (
@@ -161,6 +184,7 @@ export default function App() {
           </div>
         </div>
       )}
+      {mapFocus && <MapOverlay days={it.days} trip={trip} focus={mapFocus} close={() => setMapFocus(null)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   )
@@ -219,9 +243,10 @@ interface PlanProps {
   updateSeg: (uid: string, fn: (s: SegmentState) => SegmentState) => void
   update: (fn: (t: TripState) => TripState) => void
   setSheet: (s: Sheet) => void
+  openMap: (f: Focus) => void
 }
 
-function PlanView({ trip, days, segTotals, pace, updateSeg, update, setSheet }: PlanProps) {
+function PlanView({ trip, days, segTotals, pace, updateSeg, update, setSheet, openMap }: PlanProps) {
   if (!days.length) return <p className="card pad">No routes enabled — switch some on in Routes.</p>
   const walkNos = days.reduce<number[]>((acc, d) => [...acc, (acc[acc.length - 1] ?? 0) + (d.kind === 'walk' ? 1 : 0)], [])
   return (
@@ -229,7 +254,14 @@ function PlanView({ trip, days, segTotals, pace, updateSeg, update, setSheet }: 
       {days.map((d, i) => {
         const header =
           d.segUid !== days[i - 1]?.segUid && d.route ? (
-            <SegHeader key={`h-${d.segUid}`} name={d.route.name} color={d.route.color} t={segTotals[d.segUid]} pace={pace} />
+            <SegHeader
+              key={`h-${d.segUid}`}
+              name={d.route.name}
+              color={d.route.color}
+              t={segTotals[d.segUid]}
+              pace={pace}
+              onMap={() => openMap({ kind: 'seg', segUid: d.segUid })}
+            />
           ) : null
         const seg = trip.segments.find((s) => s.uid === d.segUid)!
         if (d.kind === 'rest') {
@@ -263,6 +295,8 @@ function PlanView({ trip, days, segTotals, pace, updateSeg, update, setSheet }: 
               updateSeg={updateSeg}
               update={update}
               setSheet={setSheet}
+              days={days}
+              openMap={openMap}
             />
           </div>
         )
@@ -271,10 +305,27 @@ function PlanView({ trip, days, segTotals, pace, updateSeg, update, setSheet }: 
   )
 }
 
-function SegHeader({ name, color, t, pace }: { name: string; color: string; t?: Totals & { days: number }; pace: number }) {
+function SegHeader({
+  name,
+  color,
+  t,
+  pace,
+  onMap,
+}: {
+  name: string
+  color: string
+  t?: Totals & { days: number }
+  pace: number
+  onMap: () => void
+}) {
   return (
     <div className="seg-head" style={{ ['--seg' as string]: color }}>
-      <h2>{name}</h2>
+      <div className="row between">
+        <h2>{name}</h2>
+        <button className="mini" onClick={onMap}>
+          🗺 Map
+        </button>
+      </div>
       {t && (
         <div className="muted small">
           {t.days} days · <Stats t={t} pace={pace} compact />
@@ -293,6 +344,8 @@ function DayCard({
   updateSeg,
   update,
   setSheet,
+  days,
+  openMap,
 }: {
   d: Extract<DayPlan, { kind: 'walk' }>
   n: number
@@ -302,6 +355,8 @@ function DayCard({
   updateSeg: PlanProps['updateSeg']
   update: PlanProps['update']
   setSheet: (s: Sheet) => void
+  days: DayPlan[]
+  openMap: (f: Focus) => void
 }) {
   const [open, setOpen] = useState(false)
   const start = d.stops[0]
@@ -386,6 +441,12 @@ function DayCard({
 
       {open && (
         <div className="day-body">
+          <div className="day-map" onClick={() => openMap({ kind: 'day', day: d.idx })} role="button" aria-label="Open full-screen map">
+            <LazyMap days={days} trip={trip} focus={{ kind: 'day', day: d.idx }} mini className="mini" />
+            <span className="map-expand" aria-hidden>
+              ⤢
+            </span>
+          </div>
           <ol className="stops">
             {d.stops.map((s, i) => {
               const lx = d.legs[i]
@@ -408,8 +469,10 @@ function DayCard({
                     )}
                   </div>
                   {s.wp.note && <div className="stop-note">{s.wp.note}</div>}
+                  {stopGuide(s.id) && <div className="stop-note guide">{stopGuide(s.id)}</div>}
                   {s.wp.water && <div className="stop-note">💧 {s.wp.water}</div>}
                   {trip.stopNotes[s.id] && <div className="stop-note mine">📝 {trip.stopNotes[s.id]}</div>}
+                  <SideTrips trips={(route.sideTrips ?? []).filter((t) => t.at === s.id)} seg={seg} afterId={s.id} updateSeg={updateSeg} pace={pace} />
                   {lx && (
                     <div className="leg">
                       <button className="leg-stats" onClick={() => setSheet({ kind: 'leg', segUid: seg.uid, lx })}>
@@ -417,6 +480,12 @@ function DayCard({
                         {lx.overridden && <em> (edited)</em>}
                         {' '}✎
                       </button>
+                      {lx.editable !== 'custom' && legGuide(lx.baseKey) && (
+                        <p className="track-notes">
+                          {lx.editable === 'remainder' && <b>{lx.baseKey.split('>').map((id) => route.stops.find((w) => w.id === id)?.name).join(' → ')}: </b>}
+                          {legGuide(lx.baseKey)}
+                        </p>
+                      )}
                       {lx.leg.note && <div className="leg-note">{lx.leg.note}</div>}
                       <button
                         className="mini ghost"
@@ -461,6 +530,71 @@ function DayCard({
       {!open && trip.dayNotes[d.noteKey] && <p className="day-note-preview">📝 {trip.dayNotes[d.noteKey]}</p>}
       {hrs >= 9 && <p className="warn small pad-x">Long day — {fmtHrs(hrs)} at your pace.</p>}
     </article>
+  )
+}
+
+function SideTrips({
+  trips,
+  seg,
+  afterId,
+  updateSeg,
+  pace,
+}: {
+  trips: SideTrip[]
+  seg: SegmentState
+  afterId: string
+  updateSeg: PlanProps['updateSeg']
+  pace: number
+}) {
+  if (!trips.length) return null
+  return (
+    <div className="side-trips">
+      {trips.map((t) => {
+        const added = seg.customStops.find((c) => c.side && c.name === t.name)
+        return (
+          <details key={t.name} className="side-trip">
+            <summary>
+              <span>⛰ {t.name}</span>
+              <small>
+                {t.km} km · ↑{t.up} m · {fmtHrs(t.hrs * pace)} return{added && ' · ✓ in plan'}
+              </small>
+            </summary>
+            {t.note && <p>{t.note}</p>}
+            {added ? (
+              <button
+                className="mini ghost"
+                onClick={() =>
+                  updateSeg(seg.uid, (s) => ({
+                    ...s,
+                    customStops: s.customStops
+                      .filter((c) => c.id !== added.id)
+                      .map((c) => (c.afterId === added.id ? { ...c, afterId: added.afterId } : c)),
+                  }))
+                }
+              >
+                Remove from day
+              </button>
+            ) : (
+              <button
+                className="mini"
+                onClick={() => {
+                  const id = `c-${Math.random().toString(36).slice(2, 8)}`
+                  updateSeg(seg.uid, (s) => ({
+                    ...s,
+                    customStops: [
+                      ...s.customStops.map((x) => (x.afterId === afterId ? { ...x, afterId: id } : x)),
+                      { id, name: t.name, afterId, note: t.note, side: true, km: t.km, up: t.up, down: t.up, hrs: t.hrs },
+                    ],
+                  }))
+                }}
+              >
+                + Add to this day
+              </button>
+            )}
+          </details>
+        )
+      })}
+    </div>
   )
 }
 
@@ -683,6 +817,7 @@ function SheetView({
             <h3>{sheet.stop.wp.name}</h3>
             {sheet.stop.wp.elev != null && <p className="muted">{sheet.stop.wp.elev} m{sheet.stop.wp.camp ? ' · campsite' : ''}</p>}
             {sheet.stop.wp.note && <p>{sheet.stop.wp.note}</p>}
+            {stopGuide(sheet.stop.id) && <p>{stopGuide(sheet.stop.id)}</p>}
             {sheet.stop.wp.water && <p>💧 {sheet.stop.wp.water}</p>}
             <label className="field">
               Your notes for this place
@@ -1070,6 +1205,7 @@ function MenuSheet({
           Reset to default plan
         </button>
       </div>
+      <OfflinePanel />
       <p className="muted small">Saved on this device automatically · last change {new Date(trip.updatedAt).toLocaleString()}</p>
       <button onClick={close}>Close</button>
     </>

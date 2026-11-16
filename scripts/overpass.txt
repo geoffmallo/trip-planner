@@ -1,0 +1,9 @@
+[out:json][timeout:120];
+(
+  way["highway"~"path|footway|track"](-43.32,146.05,-42.85,146.60);
+  way["highway"](-43.10,146.25,-42.90,146.50);
+  node["natural"~"peak|saddle"](-43.32,146.05,-42.85,146.60);
+  nwr["tourism"~"camp_site|alpine_hut|wilderness_hut"](-43.32,146.05,-42.85,146.60);
+  nwr["natural"="water"]["name"](-43.32,146.05,-42.85,146.60);
+);
+out body geom;
