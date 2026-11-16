@@ -117,8 +117,8 @@ export function OfflinePanel() {
     <div className="card pad offline">
       <h3>Offline map</h3>
       <p className="muted small">
-        Saves the Super Topo map around every route (wide area to zoom 12, detail along the tracks to zoom 15) plus fonts — about
-        10 MB. Download on Wi-Fi before you go; the map then works with no signal. Your GPS dot works offline too.
+        Saves the Super Topo map around every route (wide area to zoom 12, detail along the tracks to zoom 15), hillshade and fonts — about
+        23 MB. Download on Wi-Fi before you go; the map then works with no signal. Your GPS dot works offline too.
       </p>
       {st && !busy && (
         <p className="small">

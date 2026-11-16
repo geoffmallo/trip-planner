@@ -38,7 +38,7 @@ export default defineConfig({
             options: { cacheName: 'map-tiles', networkTimeoutSeconds: 4, cacheableResponse: { statuses: [200] } },
           },
           {
-            urlPattern: /^https:\/\/mapserve\.geoff-7a5\.workers\.dev\/(ofm|tas-base|osm)\//,
+            urlPattern: /^https:\/\/mapserve\.geoff-7a5\.workers\.dev\/(ofm|tas-base|osm|hillshade)\//,
             handler: 'CacheFirst',
             options: { cacheName: 'map-tiles', cacheableResponse: { statuses: [200] } },
           },
