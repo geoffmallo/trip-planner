@@ -236,3 +236,12 @@ button.suggest small { color: var(--muted); }
 .side-trip summary small { font-weight: 400; color: var(--muted); }
 .side-trip p { font-size: .84rem; line-height: 1.45; margin: 6px 0; }
 .leg .track-notes { width: 100%; }
+.map-grid-toggle {
+  position: absolute; bottom: 40px; left: 10px; z-index: 2; min-height: 30px; padding: 3px 10px;
+  font-size: .78rem; font-weight: 600; background: #fff; color: #555; border: 1px solid #ccc; border-radius: 8px;
+  box-shadow: 0 1px 4px #0003;
+}
+.map-grid-toggle.on { color: #111; border-color: #111; }
+.map-caption p { margin: 0; }
+.map-sides { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; font-size: .8rem; }
+.map-sides li.added { font-weight: 600; }

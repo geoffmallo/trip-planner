@@ -1,7 +1,8 @@
 import maplibregl, { type GeoJSONSource, type Map as MLMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DayPlan, TripState } from '../model'
+import { fmtHrs, type DayPlan, type TripState } from '../model'
+import { addUtmGrid, gridPref, setGridPref } from './gridLayer'
 import { boundsOf, dayColor, tripGeometry, type Focus, type LngLat } from './geo'
 import { superTopoStyle } from './style'
 
@@ -20,6 +21,8 @@ export default function TripMap({ days, trip, focus, className, mini, onPickDay 
   const map = useRef<MLMap | null>(null)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [grid, setGrid] = useState(gridPref)
+  const showGrid = useRef<((on: boolean) => void) | null>(null)
   const pick = useRef(onPickDay)
   useEffect(() => {
     pick.current = onPickDay
@@ -70,6 +73,8 @@ export default function TripMap({ days, trip, focus, className, mini, onPickDay 
           // Start with the attribution collapsed to its (i) button.
           m.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')
           addTripLayers(m)
+          // UTM grid under the route, as in malloMapWeb.
+          showGrid.current = addUtmGrid(m, 'trip-side-line', 'trip-side-label', gridPref())
           map.current = m
           setReady(true)
         })
@@ -90,6 +95,7 @@ export default function TripMap({ days, trip, focus, className, mini, onPickDay 
       cancelled = true
       m?.remove()
       map.current = null
+      showGrid.current = null
     }
   }, [mini])
 
@@ -121,14 +127,26 @@ export default function TripMap({ days, trip, focus, className, mini, onPickDay 
       })
     const side = g.side
       .filter((s) => inFocus(s.day))
-      .flatMap((s) => [
-        {
-          type: 'Feature' as const,
-          properties: { name: s.name },
-          geometry: { type: 'LineString' as const, coordinates: [s.at, s.to] },
-        },
-        { type: 'Feature' as const, properties: { name: s.name.replace(/\s*\(.*\)$/, '') }, geometry: { type: 'Point' as const, coordinates: s.to } },
-      ])
+      .flatMap((s) => {
+        const props = { added: s.added ? 1 : 0 }
+        return [
+          {
+            type: 'Feature' as const,
+            properties: { ...props, name: s.name },
+            geometry: { type: 'LineString' as const, coordinates: [s.at, s.to] },
+          },
+          {
+            type: 'Feature' as const,
+            properties: {
+              ...props,
+              name: s.name.replace(/\s*\(.*\)$/, ''),
+              // ASCII + Latin-1 only: those are the glyph ranges cached for offline use.
+              time: `${fmtHrs(s.hrs)} return · ${s.km} km${s.added ? ' · in plan' : ''}`,
+            },
+            geometry: { type: 'Point' as const, coordinates: s.to },
+          },
+        ]
+      })
     ;(m.getSource('trip-lines') as GeoJSONSource).setData({ type: 'FeatureCollection', features: lines })
     ;(m.getSource('trip-points') as GeoJSONSource).setData({ type: 'FeatureCollection', features: points })
     ;(m.getSource('trip-side') as GeoJSONSource).setData({ type: 'FeatureCollection', features: side })
@@ -146,6 +164,21 @@ export default function TripMap({ days, trip, focus, className, mini, onPickDay 
     <div className={`trip-map ${className ?? ''}`}>
       <div ref={el} className="trip-map-canvas" />
       {failed && <div className="map-msg">Map unavailable</div>}
+      {!mini && ready && (
+        <button
+          className={`map-grid-toggle ${grid ? 'on' : ''}`}
+          aria-pressed={grid}
+          title="Show or hide the UTM grid"
+          onClick={() => {
+            const next = !grid
+            setGrid(next)
+            setGridPref(next)
+            showGrid.current?.(next)
+          }}
+        >
+          # Grid
+        </button>
+      )}
     </div>
   )
 }
@@ -161,8 +194,17 @@ function addTripLayers(m: MLMap) {
     id: 'trip-side-line',
     type: 'line',
     source: 'trip-side',
-    filter: ['==', ['geometry-type'], 'LineString'],
-    paint: { 'line-color': '#5b4a8a', 'line-width': 2, 'line-dasharray': [1.5, 1.5] },
+    paint: { 'line-color': '#5b4a8a', 'line-width': 2.5, 'line-dasharray': [1.5, 1.5] },
+    filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'added'], 0]],
+  })
+  // Side trips already in the plan draw solid.
+  m.addLayer({
+    id: 'trip-side-line-added',
+    type: 'line',
+    source: 'trip-side',
+    filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'added'], 1]],
+    layout: { 'line-cap': 'round' },
+    paint: { 'line-color': '#5b4a8a', 'line-width': 3 },
   })
   m.addLayer({
     id: 'trip-casing',
@@ -191,7 +233,7 @@ function addTripLayers(m: MLMap) {
     type: 'circle',
     source: 'trip-side',
     filter: ['==', ['geometry-type'], 'Point'],
-    paint: { 'circle-radius': 4, 'circle-color': '#5b4a8a', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
+    paint: { 'circle-radius': ['case', ['==', ['get', 'added'], 1], 5, 4], 'circle-color': '#5b4a8a', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
   })
   m.addLayer({
     id: 'trip-stop',
@@ -217,8 +259,16 @@ function addTripLayers(m: MLMap) {
     type: 'symbol',
     source: 'trip-side',
     filter: ['==', ['geometry-type'], 'Point'],
-    minzoom: 12,
-    layout: { 'text-field': ['get', 'name'], 'text-font': font, 'text-size': 11, 'text-offset': [0, 1], 'text-anchor': 'top', 'text-optional': true },
+    minzoom: 11,
+    layout: {
+      'text-field': ['format', ['get', 'name'], { 'font-scale': 1 }, '\n', {}, ['get', 'time'], { 'font-scale': 0.85 }],
+      'text-font': font,
+      'text-size': 11,
+      'text-offset': [0, 0.9],
+      'text-anchor': 'top',
+      'text-optional': true,
+      'symbol-sort-key': ['-', 1, ['get', 'added']],
+    },
     paint: { 'text-color': '#4a3a78', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
   })
   m.addLayer({

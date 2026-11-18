@@ -7,7 +7,8 @@ Phone-first PWA for planning multi-day hikes (Western Arthurs A–K / Full Trave
 - Add rest/weather days at any camp, transfer days between routes, your own stops, and notes.
 - Tap any leg to correct distance / ascent / descent / time (route figures are research estimates).
 - Pace multiplier (⋯ menu) scales all times.
-- **Maps** on the Super Topo basemap (malloMap's mapserve worker): a Map tab for the whole trip, 🗺 Map per route, and a map in each expanded day (tap for full screen, with GPS dot). Hillshade (mapserve terrain-RGB, from zoom 12, as malloMapWeb adds it). Days are colour-coded; side trips show dashed.
+- **Maps** on the Super Topo basemap (malloMap's mapserve worker): a Map tab for the whole trip, 🗺 Map per route, and a map in each expanded day (tap for full screen, with GPS dot). Hillshade (mapserve terrain-RGB, from zoom 12, as malloMapWeb adds it). Days are colour-coded. Side trips show dashed (solid once added to the day), labelled with return time at your pace and distance; a day's map caption lists its side-trip options with time, distance and climb.
+- **UTM grid** on every map, ported from malloMapWeb (`src/map/utmGrid.ts`): 1 km squares stepping to 10 km and 100 km as you zoom out, topo-sheet numbering (small 100 km prefix, large principal figures). Drawn from maths, so it works offline. Toggle with *# Grid*; the choice is remembered.
 - **Offline map:** Map tab (or ⋯ menu) → *Download offline map* saves ~1,440 tiles incl. hillshade (~23 MB) around the routes into Cache Storage; the service worker serves them cache-first.
 - **Guidebook:** expanded days show track notes for every leg, extra stop notes and side-trip options (tap to read, *+ Add to this day*). Researched from PWS walk notes and trip reports — `src/data/guide.json` (sources listed there).
 - Saved on-device (localStorage), works offline once installed.

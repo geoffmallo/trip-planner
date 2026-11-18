@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { fmtDate, type DayPlan, type TripState } from './model'
+import { fmtDate, fmtHrs, type DayPlan, type TripState } from './model'
 import { clearOffline, downloadOffline, offlineStatus, type OfflineStatus } from './map/offline'
 import { dayColor, type Focus } from './map/geo'
 
@@ -47,14 +47,32 @@ function DayChips({ days, focus, setFocus }: { days: DayPlan[]; focus: Focus; se
   )
 }
 
-function FocusCaption({ days, focus }: { days: DayPlan[]; focus: Focus }) {
+function FocusCaption({ days, trip, focus }: { days: DayPlan[]; trip: TripState; focus: Focus }) {
   if (focus.kind !== 'day') return null
   const d = days[focus.day]
   if (!d || d.kind !== 'walk') return null
+  const pace = trip.pace || 1
+  const custom = trip.segments.find((s) => s.uid === d.segUid)?.customStops ?? []
+  const sides = (d.route.sideTrips ?? []).filter((t) => d.stops.some((s) => s.id === t.at))
   return (
-    <p className="map-caption">
-      {fmtDate(d.date)} · {d.stops[0].wp.name} → {d.stops[d.stops.length - 1].wp.name} · {d.totals.km.toFixed(1)} km ↑{Math.round(d.totals.up)} m
-    </p>
+    <div className="map-caption">
+      <p>
+        {fmtDate(d.date)} · {d.stops[0].wp.name} → {d.stops[d.stops.length - 1].wp.name} · {d.totals.km.toFixed(1)} km ↑{Math.round(d.totals.up)} m ·{' '}
+        {fmtHrs(d.totals.hrs * pace)}
+      </p>
+      {sides.length > 0 && (
+        <ul className="map-sides">
+          {sides.map((t) => {
+            const added = custom.some((c) => c.side && c.name === t.name)
+            return (
+              <li key={t.name} className={added ? 'added' : ''}>
+                ⛰ {t.name} <span className="muted">· {fmtHrs(t.hrs * pace)} return · {t.km} km ↑{t.up} m{added ? ' · in plan' : ''}</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -65,7 +83,7 @@ export function MapTab({ days, trip, onOpenDay }: { days: DayPlan[]; trip: TripS
     <section className="map-tab">
       <DayChips days={days} focus={focus} setFocus={setFocus} />
       <LazyMap days={days} trip={trip} focus={focus} className="tall" onPickDay={(day) => setFocus({ kind: 'day', day })} />
-      <FocusCaption days={days} focus={focus} />
+      <FocusCaption days={days} trip={trip} focus={focus} />
       {focus.kind === 'day' && (
         <button className="mini" onClick={() => onOpenDay(focus.kind === 'day' ? focus.day : 0)}>
           Open day in itinerary ›
@@ -93,7 +111,7 @@ export function MapOverlay({ days, trip, focus: initial, close }: { days: DayPla
         <DayChips days={days} focus={focus} setFocus={setFocus} />
       </div>
       <LazyMap days={days} trip={trip} focus={focus} className="fill" onPickDay={(day) => setFocus({ kind: 'day', day })} />
-      <FocusCaption days={days} focus={focus} />
+      <FocusCaption days={days} trip={trip} focus={focus} />
     </div>
   )
 }

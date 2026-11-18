@@ -64,6 +64,18 @@ export interface Marker {
   label?: string // e.g. "D3"
 }
 
+/** A side trip drawn on the map: junction to objective, with its return figures at the walker's pace. */
+export interface SideLine {
+  at: LngLat
+  to: LngLat
+  name: string
+  day: number
+  km: number
+  up: number
+  hrs: number // return time, already multiplied by pace
+  added: boolean // in the day's plan (vs. an optional suggestion)
+}
+
 /**
  * Lines and markers for every walking day. Custom stops have no surveyed position,
  * so they are placed along their base leg by distance.
@@ -71,7 +83,8 @@ export interface Marker {
 export function tripGeometry(days: DayPlan[], trip: TripState) {
   const pieces: Piece[] = []
   const markers: Marker[] = []
-  const side: { at: LngLat; to: LngLat; name: string; day: number }[] = []
+  const side: SideLine[] = []
+  const pace = trip.pace || 1
   let walk = 0
   let lastSeg = ''
   // progress (km) through each base leg, per segment, so split legs slice correctly
@@ -118,7 +131,9 @@ export function tripGeometry(days: DayPlan[], trip: TripState) {
       if (!d.stops.some((s) => s.id === t.at)) continue
       const at = stopLL(t.at)
       const to = sideTarget(t)
-      if (at && to) side.push({ at, to, name: t.name, day: d.idx })
+      if (!at || !to) continue
+      const added = (seg?.customStops ?? []).some((c) => c.side && c.name === t.name)
+      side.push({ at, to, name: t.name, day: d.idx, km: t.km, up: t.up, hrs: t.hrs * pace, added })
     }
     lastSeg = d.segUid
   }
