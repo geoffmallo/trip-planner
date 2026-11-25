@@ -1,0 +1,38 @@
+# Dependency updates, standardised across geoffmallo repos.
+#
+# Security fixes arrive as their own PRs as soon as an advisory is published
+# (Dependabot alerts and security updates are on in repo settings). Routine
+# churn is batched weekly so it doesn't flood the PR list. Majors are
+# deliberate migrations, taken by hand -- a drive-by major has broken the
+# build more than once.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Australia/Sydney
+    # 10, not 5: a full queue stops *new* security PRs from surfacing, so a
+    # stalled backlog quietly blocks fixes.
+    open-pull-requests-limit: 10
+    # Wait a week after a release before proposing it, so a compromised or
+    # broken version has time to be caught upstream.
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+      timezone: Australia/Sydney
+    groups:
+      actions:
+        patterns: ["*"]
