@@ -1,9 +1,15 @@
-import maplibregl, { type GeoJSONSource, type Map as MLMap } from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+import type { GeoJSONSource, Map as MLMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+// MapLibre v6 is ESM-only and no longer finds its worker by itself under a bundler:
+// Vite bundles the worker as its own hashed asset (so the PWA precaches it) and we hand over its URL.
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DayPlan, TripState } from '../model'
 import { boundsOf, dayColor, tripGeometry, type Focus, type LngLat } from './geo'
 import { superTopoStyle } from './style'
+
+maplibregl.setWorkerUrl(workerUrl)
 
 interface Props {
   days: DayPlan[]
